@@ -21,3 +21,5 @@ if __name__ == '__main__':
             f.write(
                 f'DEVICE_PATH={os.path.basename(args.output) + os.sep + device_tree.device_info.manufacturer + os.sep + device_tree.device_info.codename}')
     device_tree.dump_to_folder(Path(args.output))
+    with open(os.path.basename(args.output) + os.sep + device_tree.device_info.manufacturer + os.sep + device_tree.device_info.codename+os.sep+'Android.bp', 'r') as f:
+        print(f.read())
