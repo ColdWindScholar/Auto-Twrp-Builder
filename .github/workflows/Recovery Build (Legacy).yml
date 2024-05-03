@@ -104,6 +104,8 @@ jobs:
         repo sync -j$(nproc --all) --force-sync
       working-directory: workspace
     - uses: actions/download-artifact@v3
+      with:
+          path: ${{ steps.pwd.outputs.workspace-folder }}
     - name: Clone device tree
       run: |
         mv ./DeviceTree/dt ./${{ github.event.inputs.DEVICE_PATH }}
