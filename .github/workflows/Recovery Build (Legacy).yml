@@ -19,18 +19,6 @@ on:
         description: 'MANIFEST_BRANCH'
         required: true
         default: 'twrp-7.1'
-      DEVICE_PATH:
-        description: 'DEVICE_PATH'
-        required: true
-        default: 'device/EEBBK/H3000S'
-      DEVICE_NAME:
-        description: 'DEVICE_NAME'
-        required: true
-        default: 'H3000S'
-      MAKEFILE_NAME:
-        description: 'MAKEFILE_NAME'
-        required: true
-        default: 'omni_H3000S'
       BUILD_TARGET:
         description: 'BUILD_TARGET'
         required: true
@@ -49,12 +37,9 @@ jobs:
         echo "::group::User Environment Variables"
         echo "Manifest URL: ${{ github.event.inputs.MANIFEST_URL }}"
         echo "Manifest Branch: ${{ github.event.inputs.MANIFEST_BRANCH }}"
-        echo "Device Path: ${{ github.event.inputs.DEVICE_PATH }}"
-        echo "Device Name: ${{ github.event.inputs.DEVICE_NAME }}"
-        echo "Makefile Name: ${{ github.event.inputs.MAKEFILE_NAME }}"
         echo "Build Target: ${{ github.event.inputs.BUILD_TARGET }}.img"
         echo "::endgroup::"
- 
+
     # You might want to Checkout your repo first, but not mandatory
     - name: Check Out
       uses: actions/checkout@v3
@@ -68,7 +53,9 @@ jobs:
         sudo apt update
         sudo apt -y upgrade
         sudo apt -y install gperf gcc-multilib gcc-10-multilib g++-multilib g++-10-multilib libc6-dev lib32ncurses5-dev x11proto-core-dev libx11-dev tree lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc bc ccache lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libwxgtk3.0-gtk3-dev libxml2 lzop pngcrush schedtool squashfs-tools imagemagick libbz2-dev lzma ncftp qemu-user-static libstdc++-10-dev libncurses5 python3
-
+        sudo apt -y install python3 python3-pip cpio wget
+        pip3 install twrpdtgen
+    
     - name: Install OpenJDK
       uses: actions/setup-java@v3
       with:
@@ -88,7 +75,7 @@ jobs:
         curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
         chmod a+x ~/bin/repo
         sudo ln -sf ~/bin/repo /usr/bin/repo
-      
+
     - name: Initialize repo
       run: |
         mkdir workspace
@@ -98,7 +85,7 @@ jobs:
         git config --global user.email "azwhikaru+37921907@github.com"
         repo init --depth=1 -u ${{ github.event.inputs.MANIFEST_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
       id: pwd
-          
+
     - name: Repo Sync
       run: |
         repo sync -j$(nproc --all) --force-sync
@@ -106,14 +93,16 @@ jobs:
     - uses: actions/download-artifact@v3
       with:
           path: ${{ steps.pwd.outputs.workspace-folder }}
-    - name: Clone device tree
+    - name: Generate Device Tree
       run: |
-        mv ./DeviceTree/dt ./${{ github.event.inputs.DEVICE_PATH }}
+        wget ${{ github.event.inputs.IMG_URL }}
+        python3 ${GITHUB_WORKSPACE}/scripts/build.py -i *.img -o device
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      id: gdt
 
     - name: Sync Device Dependencies
       run: |
-        bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ github.event.inputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
+        bash ${GITHUB_WORKSPACE}/scripts/convert.sh ${{ steps.gdt.outputs.DEVICE_PATH }}/${{ steps.buildtree.outputs.value }}.dependencies
         repo sync -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       continue-on-error: true
@@ -135,62 +124,21 @@ jobs:
       run: |
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng && make clean && make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+        lunch ${{ steps.gdt.outputs.MAKEFILE_NAME }}-eng && make clean && make ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Upload to Release
       uses: softprops/action-gh-release@v1
       with:
         files: | 
-          workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/${{ github.event.inputs.BUILD_TARGET }}.img
-          workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
-          workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*vendor*.img
-        name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
+          workspace/out/target/product/${{ steps.gdt.outputs.DEVICE_NAME }}/${{ github.event.inputs.BUILD_TARGET }}.img
+          workspace/out/target/product/${{ steps.gdt.outputs.DEVICE_NAME }}/*.zip
+          workspace/out/target/product/${{ steps.gdt.outputs.DEVICE_NAME }}/*vendor*.img
+        name: ${{ steps.gdt.outputs.DEVICE_NAME }}-${{ github.run_id }}
         tag_name: ${{ github.run_id }}
         body: |
           Manifest: ${{ github.event.inputs.MANIFEST_BRANCH }}
-          Device: ${{ github.event.inputs.DEVICE_NAME }}
+          Device: ${{ steps.gdt.outputs.DEVICE_NAME }}
           Target: ${{ github.event.inputs.BUILD_TARGET }}.img
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  gen_twrp_tree:
-    if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - name: Check Out
-        uses: actions/checkout@main
-
-      - name: Prepare the environment
-        run: |
-          sudo apt update
-          sudo apt -y install python3 python3-pip cpio wget
-
-      - name: Set variables
-        run: |
-          echo "name=date::$(date +%F)" >> $GITHUB_OUTPUT
-        id: var
-
-      - name: Install TWRP generator
-        run: |
-          pip3 install twrpdtgen
-          mkdir dt
-
-      - name: Download boot or recovery img
-        run: |
-          wget ${{ github.event.inputs.IMG_URL }}
-          ls
-
-      - name: Start build
-        run: |
-          python3 -m twrpdtgen -o dt/ *.img
-
-      - name: Upload Device Tree
-        if: success()
-        uses: actions/upload-artifact@v3
-        with:
-          name: DeviceTree
-          path: './dt'
