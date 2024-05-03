@@ -37,46 +37,6 @@ on:
         default: 'recovery'
 
 jobs:
-  gen_terp_tree:
-    if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - name: Check Out
-        uses: actions/checkout@main
-
-      - name: Prepare the environment
-        run: |
-          sudo apt update
-          sudo apt -y install python3 python3-pip cpio wget
-
-      - name: Set variables
-        run: |
-          echo "name=date::$(date +%F)" >> $GITHUB_OUTPUT
-        id: var
-
-      - name: Install TWRP generator
-        run: |
-          pip3 install twrpdtgen
-          mkdir dt
-
-      - name: Download boot or recovery img
-        run: |
-          wget ${{ github.event.inputs.IMG_URL }}
-          ls
-
-      - name: Start build
-        run: |
-          python3 -m twrpdtgen -o dt/ *.img
-
-      - name: Upload Device Tree
-        if: success()
-        uses: actions/upload-artifact@v3
-        with:
-          name: DeviceTree
-          path: './dt'
   build:
     needs: [gen_twrp_tree]
     if: github.event.repository.owner.id == github.event.sender.id
@@ -194,4 +154,43 @@ jobs:
           Target: ${{ github.event.inputs.BUILD_TARGET }}.img
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  gen_twrp_tree:
+    if: github.event.repository.owner.id == github.event.sender.id
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Check Out
+        uses: actions/checkout@main
 
+      - name: Prepare the environment
+        run: |
+          sudo apt update
+          sudo apt -y install python3 python3-pip cpio wget
+
+      - name: Set variables
+        run: |
+          echo "name=date::$(date +%F)" >> $GITHUB_OUTPUT
+        id: var
+
+      - name: Install TWRP generator
+        run: |
+          pip3 install twrpdtgen
+          mkdir dt
+
+      - name: Download boot or recovery img
+        run: |
+          wget ${{ github.event.inputs.IMG_URL }}
+          ls
+
+      - name: Start build
+        run: |
+          python3 -m twrpdtgen -o dt/ *.img
+
+      - name: Upload Device Tree
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: DeviceTree
+          path: './dt'
