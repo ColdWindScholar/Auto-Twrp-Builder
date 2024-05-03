@@ -6,7 +6,7 @@ on:
       IMG_URL:
         description: 'IMG_URL'
         required: true
-        default: 'https://raw.githubusercontent.com/KoCleo/action_build_twrp_device_tree/main/recovery.img'
+        default: 'https://github.com/KoCleo/Auto-Twrp-Builder/raw/master/recovery.img'
       MANIFEST_URL:
         description: 'MANIFEST_URL (if want to use SSH keys, use git@github.com:XXXXX)'
         required: true
@@ -14,7 +14,7 @@ on:
       MANIFEST_BRANCH:
         description: 'MANIFEST_BRANCH'
         required: true
-        default: 'twrp-7.1'
+        default: 'twrp-8.1'
       BUILD_TARGET:
         description: 'BUILD_TARGET'
         required: true
