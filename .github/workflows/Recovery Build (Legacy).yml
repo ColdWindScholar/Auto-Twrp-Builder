@@ -84,9 +84,6 @@ jobs:
       run: |
         repo sync -j$(nproc --all) --force-sync
       working-directory: workspace
-    - uses: actions/download-artifact@v3
-      with:
-          path: ${{ steps.pwd.outputs.workspace-folder }}
     - name: Generate Device Tree
       run: |
         wget ${{ github.event.inputs.IMG_URL }}
