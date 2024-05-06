@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       IMG_URL:
-        description: 'IMG_URL'
+        description: 'IMG_ URL'
         required: true
         default: 'https://github.com/KoCleo/Auto-Twrp-Builder/raw/master/recovery.img'
       MANIFEST_URL:
